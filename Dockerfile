@@ -12,4 +12,5 @@ RUN pip3 install scipy
 RUN yum install gcc gcc-c++ python36-devel -y
 RUN pip3 install pystan
 RUN pip3 install tensorflow
+WORKDIR /project
 CMD [ "/bin/bash" ]
