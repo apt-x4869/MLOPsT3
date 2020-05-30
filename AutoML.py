@@ -10,6 +10,7 @@ from keras.regularizers import l2
 from keras.datasets import mnist
 from keras.utils import np_utils
 import keras
+import pandas as pd
 
 # loads the MNIST dataset
 (x_train, y_train), (x_test, y_test)  = mnist.load_data()
@@ -60,73 +61,73 @@ def CRP(model, xCRP, input_shape=None, pool_size=(2,2)):
 def Flat(model):
     model.add(Flatten())
     return model
-def DenseLayer(model,xDense,output_shape=128):
+def DenseLayer(model,xDense,output_shape=128, units=500):
     for i in range(1,xDense+1) :
         if i == (xDense) and output_shape != None:
             model.add(Dense(units=output_shape))
             model.add(Activation("softmax"))
             continue
-        model.add(Dense(units=500))
+        model.add(Dense(units=units))
         model.add(Activation("relu"))
     return model
 
-# 2 sets of CRP (Convolution, RELU, Pooling)
-'''
-model.add(Conv2D(20, (5, 5),
-                 padding = "same", 
-                 input_shape = input_shape))
-model.add(Activation("relu"))
-model.add(MaxPooling2D(pool_size = (2, 2) ))
+def modelCompile(model, no_CRP_layers, no_Dense_layers, pool_size=None, input_shape=None,output_shape=None):
+    model = CRP(model, no_CRP_layers, input_shape=input_shape, pool_size=pool_size)
+    model = Flat(model)
+    model = DenseLayer(model, no_Dense_layers, num_classes)
+    model.compile(loss = 'categorical_crossentropy', optimizer = keras.optimizers.Adadelta(), metrics = ['accuracy'])
+    return model
 
-model.add(Conv2D(50, (5, 5),
-                 padding = "same"))
-model.add(Activation("relu"))
-model.add(MaxPooling2D(pool_size = (2, 2), strides = (2, 2)))
-'''
-# Fully connected layers (w/ RELU)
-'''
-model.add(Flatten())
-model.add(Dense(500))
-model.add(Activation("relu"))
-'''               
-# Softmax (for classification)
-'''
-model.add(Dense(num_classes))
-model.add(Activation("softmax"))
-'''
-no_CRP_layers = 2
-no_Dense_layers = 2      
-
-model = CRP(model, no_CRP_layers, input_shape=input_shape)
-model = Flat(model)
-model = DenseLayer(model, no_Dense_layers, num_classes)
-
-
-
-
-model.compile(loss = 'categorical_crossentropy',
-              optimizer = keras.optimizers.Adadelta(),
-              metrics = ['accuracy'])
-    
-print(model.summary())
-
-
-# ### Now let us train LeNet on our MNIST Dataset
-
+# Model HyperParameters
+a = pd.read_csv('hPara.csv')
+a = a.where(pd.notnull(a), None)
+flag=0
+try :
+    no_CRP_layers = int(a.iloc[-1,0])
+except:
+    no_CRP_layers = 1
+    flag=1
+try :
+    no_Dense_layers = int(a.iloc[-1,1]) 
+except:
+    no_Dense_layers = 1
+pool_size=(2,2)
 
 # Training Parameters
+try:
+    epochs=int(a.iloc[-1,2])
+except:
+    epochs = 1
 batch_size = 128
-epochs = 2
 
-model.fit(x_train, y_train,
-          batch_size=batch_size,
-          epochs=epochs,
-          validation_data=(x_test, y_test),
-          shuffle=True)
+# 2 sets of CRP (Convolution, RELU, Pooling)
+# Fully connected layers (w/ RELU)          
+# Softmax (for classification)
+model = modelCompile(model, no_CRP_layers, no_Dense_layers, pool_size=(2,2),input_shape=input_shape, output_shape=num_classes)
 
+print(model.summary())
+
+# Now Let's Train our model
+model.fit(x_train, y_train, batch_size=batch_size, epochs=epochs, validation_data=(x_test, y_test), shuffle=True, verbose=0)
+
+#Saving Model
 model.save("mnist_LeNet.h5")
 
 # Evaluate the performance of our trained model
-scores = model.evaluate(x_test, y_test, verbose=1)
-print('Test loss:', scores[0])
-print('Test accuracy:', scores[1])
+scores = model.evaluate(x_test, y_test, verbose=0)
+if flag==1:
+    x = { 'no_CRP_layers':no_CRP_layers,
+         'no_Dense_layers':no_Dense_layers,
+         'epochs':epochs,
+         'acc':scores[1]
+        }
+    print(x)
+    a = a.append(x,ignore_index=True,sort=False)
+else:
+    a.iloc[-1,0]=no_CRP_layers
+    a.iloc[-1,1]=no_Dense_layers
+    a.iloc[-1,2]=epochs
+    a.iloc[-1,3]=scores[1]
+a.to_csv('hPara.csv',index=False) 
+print(a)
+
